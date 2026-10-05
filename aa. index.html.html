@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hóa Đơn Bán Hàng - An An Gift</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Montserrat -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- html2canvas for Image export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- html2pdf for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+
+        /* Colors matching template */
+        .bg-burgundy { background-color: #800000; }
+        .text-burgundy { color: #800000; }
+        .border-burgundy { border-color: #800000; }
+        .hover-burgundy:hover { background-color: #660000; }
+
+        /* Dotted underlines for inputs */
+        .dotted-input {
+            border: none;
+            border-bottom: 1px dotted #6b7280;
+            background: transparent;
+            outline: none;
+            width: 100%;
+            padding: 2px 4px;
+        }
+        .dotted-input:focus {
+            border-bottom: 1px solid #800000;
+        }
+
+        /* Custom Table Borders */
+        .invoice-table th, .invoice-table td {
+            border: 1px solid #7a1c1c;
+        }
+
+        /* Hide Scrollbar for print preview optimization */
+        textarea {
+            resize: none;
+            overflow: hidden;
+        }
+
+        /* Print CSS optimization */
+        @media print {
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-container {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            /* Ensure background colors print properly */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body class="p-2 sm:p-4 md:p-6 min-h-screen">
+
+    <div class="max-w-4xl mx-auto space-y-4">
+
+        <!-- Top Action Bar (Toolbar Buttons) -->
+        <div class="no-print bg-white p-3 md:p-4 rounded-xl shadow-md space-y-3 border border-gray-200">
+            <!-- First Row Buttons -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+                <!-- Kho Mã Hàng -->
+                <button onclick="openModal('inventoryModal')" class="bg-[#5B50E6] hover:bg-[#4A40D5] text-white font-semibold py-2.5 px-3 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-sm md:text-base">
+                    <span>📦</span> <span>Kho Mã Hàng</span>
+                </button>
+                <!-- Lưu Nháp -->
+                <button onclick="saveDraft()" class="bg-[#008B8B] hover:bg-[#007575] text-white font-semibold py-2.5 px-3 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-sm md:text-base">
+                    <span>💾</span> <span>Lưu Nháp</span>
+                </button>
+                <!-- Đơn Nháp -->
+                <button onclick="openModal('draftsModal')" class="bg-[#4A5A6A] hover:bg-[#3B4855] text-white font-semibold py-2.5 px-3 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-sm md:text-base col-span-2 md:col-span-1">
+                    <span>📁</span> <span>Đơn Nháp ( <span id="draftCount">0</span> )</span>
+                </button>
+                <!-- In Hóa Đơn -->
+                <button onclick="window.print()" class="bg-[#2B70B8] hover:bg-[#205C9A] text-white font-semibold py-2.5 px-3 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-sm md:text-base">
+                    <span>🖨️</span> <span>In Hóa Đơn</span>
+                </button>
+                <!-- Xuất PDF -->
+                <button onclick="exportPDF()" class="bg-[#2E7D32] hover:bg-[#236326] text-white font-semibold py-2.5 px-3 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-sm md:text-base">
+                    <span>📄</span> <span>Xuất PDF</span>
+                </button>
+                <!-- Chụp Ảnh -->
+                <button onclick="exportImage()" class="bg-[#D97706] hover:bg-[#B45309] text-white font-semibold py-2.5 px-3 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-sm md:text-base">
+                    <span>📸</span> <span>Chụp Ảnh</span>
+                </button>
+            </div>
+
+            <!-- Second Row Button: Full Width Add Row -->
+            <button onclick="addNewRow()" class="w-full bg-[#800000] hover:bg-[#660000] text-white font-bold py-3 px-4 rounded-lg shadow flex items-center justify-center space-x-2 transition duration-200 text-base md:text-lg">
+                <span>↵ Xuống Dòng (Thêm Dòng)</span>
+            </button>
+        </div>
+
+        <!-- Sync Status Banner -->
+        <div class="no-print flex justify-end">
+            <div class="inline-flex items-center space-x-2 bg-emerald-50 text-emerald-700 text-xs md:text-sm font-medium px-3 py-1.5 rounded-md border border-emerald-200">
+                <i class="fa-solid fa-square-check text-emerald-600"></i>
+                <span>Đã đồng bộ đám mây (<span id="cloudProductCount">0</span> mã hàng sẵn sàng)</span>
+            </div>
+        </div>
+
+        <!-- Main Invoice Printable Area -->
+        <div id="invoiceArea" class="print-container bg-white p-6 md:p-10 rounded-lg shadow-lg border border-gray-200 text-gray-800">
+            
+            <!-- Header Section -->
+            <div class="text-center space-y-1 mb-4">
+                <h1 class="text-2xl md:text-3xl font-extrabold tracking-wide text-burgundy">AN AN GIFT</h1>
+                <p class="text-xs md:text-sm font-bold tracking-wider text-[#B8860B] uppercase">QUÀ TẶNG DOANH NGHIỆP & GIỎ QUÀ TẾT</p>
+                <h2 class="text-lg md:text-xl font-bold tracking-tight text-burgundy pt-2">HÓA ĐƠN BÁN HÀNG</h2>
+            </div>
+
+            <!-- Double Divider Line -->
+            <div class="border-t-2 border-b border-burgundy h-1 mb-6"></div>
+
+            <!-- Customer & Invoice Info Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-y-3 gap-x-6 text-sm font-medium mb-6">
+                <!-- Customer Details (Left Side) -->
+                <div class="md:col-span-7 space-y-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold min-w-[90px]">Khách hàng:</span>
+                        <input type="text" id="custName" class="dotted-input font-medium" placeholder="Nhập tên khách hàng / đơn vị...">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold min-w-[90px]">Điện thoại:</span>
+                        <input type="text" id="custPhone" class="dotted-input font-medium" placeholder="Nhập số điện thoại...">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold min-w-[90px]">Địa chỉ:</span>
+                        <input type="text" id="custAddress" class="dotted-input font-medium" placeholder="Nhập địa chỉ giao hàng...">
+                    </div>
+                </div>
+
+                <!-- Invoice Details (Right Side) -->
+                <div class="md:col-span-5 space-y-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold min-w-[90px]">Ngày lập:</span>
+                        <input type="text" id="invoiceDate" class="dotted-input font-medium text-center" readonly>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold min-w-[90px]">Mã hóa đơn:</span>
+                        <input type="text" id="invoiceCode" class="dotted-input font-bold text-center text-burgundy" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Table -->
+            <div class="overflow-x-auto mb-6">
+                <table class="w-full invoice-table text-xs md:text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-burgundy text-white font-bold text-center">
+                            <th class="p-2 w-10">STT</th>
+                            <th class="p-2 w-28 md:w-32">Mã Hàng</th>
+                            <th class="p-2 w-14">SL</th>
+                            <th class="p-2 w-24 md:w-28">Đơn Giá</th>
+                            <th class="p-2 w-28 md:w-32">Thành Tiền</th>
+                            <!-- Adjusted widths: Image wider, Note narrower per requirement #5 -->
+                            <th class="p-2 w-32 md:w-40">Hình Ảnh</th>
+                            <th class="p-2 min-w-[120px]">Ghi Chú</th>
+                            <th class="p-2 w-8 no-print"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="productTableBody">
+                        <!-- Dynamic Rows injected via JavaScript -->
+                    </tbody>
+                    <tfoot>
+                        <!-- Total Quantity Row -->
+                        <tr class="font-bold text-gray-800">
+                            <td colspan="2" class="p-2 text-right">Tổng số lượng:</td>
+                            <td id="totalQty" class="p-2 text-center">0</td>
+                            <td colspan="5" class="p-2 bg-gray-50"></td>
+                        </tr>
+                        <!-- Subtotal Row -->
+                        <tr class="font-bold">
+                            <td colspan="4" class="p-2 text-right">Tổng tiền hàng:</td>
+                            <td id="subTotal" class="p-2 text-center">0 đ</td>
+                            <td colspan="3" class="p-2 bg-gray-50"></td>
+                        </tr>
+                        <!-- Discount Row -->
+                        <tr class="font-bold">
+                            <td colspan="4" class="p-2 text-right">
+                                Chiết khấu ( <input type="number" id="discountPercent" min="0" max="100" value="0" oninput="calculateTotals()" class="w-12 text-center border border-gray-300 rounded px-1 py-0.5 text-xs font-semibold"> %):
+                            </td>
+                            <td id="discountAmount" class="p-2 text-center text-red-600">- 0 đ</td>
+                            <td colspan="3" class="p-2 bg-gray-50"></td>
+                        </tr>
+                        <!-- Grand Total Row -->
+                        <tr class="font-extrabold text-burgundy text-sm md:text-base bg-red-50/50">
+                            <td colspan="4" class="p-2 text-right">TỔNG TIỀN THANH TOÁN:</td>
+                            <td id="grandTotal" class="p-2 text-center">0 đ</td>
+                            <td colspan="3" class="p-2 bg-gray-50"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Signatures Section -->
+            <div class="grid grid-cols-2 gap-4 pt-4 text-center text-xs md:text-sm font-semibold mb-16">
+                <div>
+                    <p class="font-bold">Người Mua Hàng</p>
+                    <p class="text-gray-500 font-normal italic text-xs">(Ký, ghi rõ họ tên)</p>
+                </div>
+                <div>
+                    <p class="font-bold">Đại Diện An An Gift</p>
+                    <p class="text-gray-500 font-normal italic text-xs">(Ký, ghi rõ họ tên)</p>
+                </div>
+            </div>
+
+            <!-- Footer Thank You Note -->
+            <div class="text-center border-t border-gray-200 pt-4 text-xs font-medium italic text-gray-600">
+                Cảm ơn Quý khách đã tin tưởng và lựa chọn sản phẩm tại An An Gift!
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. INVENTORY CLOUD MODAL -->
+    <div id="inventoryModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 md:p-6 no-print">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg md:text-xl font-bold text-burgundy flex items-center space-x-2">
+                    <span>📦</span> <span>Quản Lý & Thêm Mã Hàng Đám Mây</span>
+                </h3>
+                <button onclick="closeModal('inventoryModal')" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-4 md:p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- Left: Form Add/Edit -->
+                <div class="md:col-span-4 space-y-4 border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-6">
+                    <h4 class="font-bold text-gray-800 border-b pb-2">Thêm / Chỉnh Sửa Mã</h4>
+                    <input type="hidden" id="editItemOriginalCode">
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Mã Hàng:</label>
+                        <input type="text" id="invCode" placeholder="Ví dụ: AA70, AA54..." class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-burgundy outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Đơn Giá (đ):</label>
+                        <input type="number" id="invPrice" placeholder="Ví dụ: 150000" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-burgundy outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Hình Ảnh Sản Phẩm (Tùy chọn):</label>
+                        <input type="file" id="invImageFile" accept="image/*" class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+                    </div>
+
+                    <div class="flex space-x-2 pt-2">
+                        <button onclick="resetInventoryForm()" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 rounded-lg text-sm transition">Làm mới</button>
+                        <button onclick="saveInventoryItem()" class="w-1/2 bg-burgundy hover:hover-burgundy text-white font-semibold py-2 rounded-lg text-sm shadow transition">💾 Lưu Đám Mây</button>
+                    </div>
+                </div>
+
+                <!-- Right: Catalog Cards Grid -->
+                <div class="md:col-span-8 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <span class="font-bold text-sm text-gray-700">📦 Tổng số: <span id="modalCatalogCount">0</span> mã hàng</span>
+                        <div class="relative w-full sm:w-48">
+                            <input type="text" id="searchCatalogInput" oninput="renderInventoryGrid()" placeholder="🔍 Tìm kiếm mã..." class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-burgundy">
+                        </div>
+                    </div>
+
+                    <!-- Cards Container -->
+                    <div id="catalogGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto p-1">
+                        <!-- Dynamic Inventory Cards -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+                <button onclick="closeModal('inventoryModal')" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold px-4 py-1.5 rounded-lg text-sm">Đóng cửa sổ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. DRAFTS MODAL -->
+    <div id="draftsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 md:p-6 no-print">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg md:text-xl font-bold text-gray-800 flex items-center space-x-2">
+                    <span>📁</span> <span>Danh Sách Đơn Hóa Đơn Nháp</span>
+                </h3>
+                <button onclick="closeModal('draftsModal')" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            <!-- Drafts List -->
+            <div id="draftsListContainer" class="p-4 overflow-y-auto space-y-3 max-h-[450px]">
+                <!-- Dynamic Draft Items -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+                <button onclick="closeModal('draftsModal')" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold px-4 py-1.5 rounded-lg text-sm">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default Sample Cloud Inventory Data
+        const DEFAULT_INVENTORY = [
+            { code: 'AA13', price: 450000, image: '' },
+            { code: 'AA45', price: 150000, image: '' },
+            { code: 'AA62', price: 1111111, image: '' },
+            { code: 'AA64', price: 45050, image: '' },
+            { code: 'AA70', price: 2132112, image: '' },
+            { code: 'AA99', price: 1121211, image: '' }
+        ];
+
+        // Global States stored in LocalStorage
+        let inventory = JSON.parse(localStorage.getItem('anan_inventory')) || DEFAULT_INVENTORY;
+        let drafts = JSON.parse(localStorage.getItem('anan_drafts')) || [];
+
+        // App Initialization
+        window.onload = function() {
+            generateInvoiceMetadata();
+            renderInventoryGrid();
+            updateCloudCount();
+            updateDraftCount();
+            
+            // Add initial empty row if body empty
+            const tableBody = document.getElementById('productTableBody');
+            if (tableBody.children.length === 0) {
+                addNewRow();
+            }
+        };
+
+        // Format Currency Helper (e.g. 150.000 đ)
+        function formatVND(amount) {
+            return new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
+        }
+
+        // Generate Invoice Code & Date
+        function generateInvoiceMetadata() {
+            const today = new Date();
+            const day = String(today.getDate()).padStart(2, '0');
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const year = today.getFullYear();
+            document.getElementById('invoiceDate').value = `${day}/${month}/${year}`;
+
+            if (!document.getElementById('invoiceCode').value) {
+                const randomNum = Math.floor(100000 + Math.random() * 900000);
+                document.getElementById('invoiceCode').value = `AA${randomNum}`;
+            }
+        }
+
+        // Auto-expand textarea for Ghi Chu (Requirement #5)
+        function autoExpandTextarea(element) {
+            element.style.height = 'auto';
+            element.style.height = (element.scrollHeight) + 'px';
+        }
+
+        // Add Row to Invoice Table
+        function addNewRow(item = { code: '', qty: 1, price: 0, image: '', note: '' }) {
+            const tableBody = document.getElementById('productTableBody');
+            const rowCount = tableBody.children.length + 1;
+
+            const tr = document.createElement('tr');
+            tr.className = 'text-center border-b border-burgundy hover:bg-gray-50/50 transition';
+
+            tr.innerHTML = `
+                <td class="p-1.5 font-semibold text-gray-600 row-stt">${rowCount}</td>
+                <td class="p-1.5">
+                    <input type="text" value="${item.code}" oninput="onCodeInput(this)" placeholder="Mã hàng..." class="w-full border border-gray-300 rounded px-2 py-1 text-center font-bold text-gray-800 uppercase focus:border-burgundy outline-none">
+                </td>
+                <td class="p-1.5">
+                    <input type="number" min="1" value="${item.qty}" oninput="calculateTotals()" class="row-qty w-full border border-gray-300 rounded px-1 py-1 text-center font-medium focus:border-burgundy outline-none">
+                </td>
+                <td class="p-1.5">
+                    <input type="number" min="0" value="${item.price}" oninput="calculateTotals()" class="row-price w-full border border-gray-300 rounded px-1.5 py-1 text-center font-medium focus:border-burgundy outline-none">
+                </td>
+                <td class="p-1.5 font-bold text-gray-800 row-amount">
+                    ${formatVND(item.qty * item.price)}
+                </td>
+                <td class="p-1.5">
+                    <div class="flex flex-col items-center justify-center space-y-1">
+                        <div class="w-20 h-20 md:w-24 md:h-24 border border-dashed border-gray-300 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden relative group">
+                            <img src="${item.image || ''}" class="row-img-preview w-full h-full object-cover ${item.image ? '' : 'hidden'}">
+                            <span class="row-img-placeholder text-[10px] text-gray-400 px-1 text-center ${item.image ? 'hidden' : ''}">An An Gift</span>
+                        </div>
+                        <label class="no-print cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium px-2 py-0.5 rounded border border-gray-300 transition">
+                            📷 Chọn ảnh
+                            <input type="file" accept="image/*" onchange="uploadRowImage(this)" class="hidden">
+                        </label>
+                    </div>
+                </td>
+                <td class="p-1.5">
+                    <textarea oninput="autoExpandTextarea(this)" rows="2" placeholder="Ghi chú..." class="row-note w-full border border-gray-300 rounded p-1.5 text-xs text-left focus:border-burgundy outline-none leading-relaxed">${item.note}</textarea>
+                </td>
+                <td class="p-1.5 no-print text-center">
+                    <button onclick="removeRow(this)" class="bg-red-500 hover:bg-red-600 text-white font-bold w-6 h-6 rounded flex items-center justify-center text-xs shadow">✕</button>
+                </td>
+            `;
+
+            tableBody.appendChild(tr);
+            calculateTotals();
+        }
+
+        // Remove Table Row
+        function removeRow(button) {
+            const tableBody = document.getElementById('productTableBody');
+            if (tableBody.children.length > 1) {
+                button.closest('tr').remove();
+                updateSTT();
+                calculateTotals();
+            } else {
+                alert('Hóa đơn phải có ít nhất 1 dòng sản phẩm!');
+            }
+        }
+
+        // Update STT column order
+        function updateSTT() {
+            const rows = document.querySelectorAll('#productTableBody tr');
+            rows.forEach((row, index) => {
+                row.querySelector('.row-stt').innerText = index + 1;
+            });
+        }
+
+        // On Product Code Typing (Auto Fill Price & Image from Cloud Inventory)
+        function onCodeInput(input) {
+            const code = input.value.trim().toUpperCase();
+            input.value = code;
+            const row = input.closest('tr');
+            
+            const matchedItem = inventory.find(i => i.code.toUpperCase() === code);
+            if (matchedItem) {
+                row.querySelector('.row-price').value = matchedItem.price;
+                if (matchedItem.image) {
+                    const imgPreview = row.querySelector('.row-img-preview');
+                    const imgPlaceholder = row.querySelector('.row-img-placeholder');
+                    imgPreview.src = matchedItem.image;
+                    imgPreview.classList.remove('hidden');
+                    imgPlaceholder.classList.add('hidden');
+                }
+            }
+            calculateTotals();
+        }
+
+        // Custom Image Upload for a Row
+        function uploadRowImage(fileInput) {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const row = fileInput.closest('tr');
+                    const imgPreview = row.querySelector('.row-img-preview');
+                    const imgPlaceholder = row.querySelector('.row-img-placeholder');
+                    imgPreview.src = e.target.result;
+                    imgPreview.classList.remove('hidden');
+                    imgPlaceholder.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Calculate Totals
+        function calculateTotals() {
+            const rows = document.querySelectorAll('#productTableBody tr');
+            let totalQty = 0;
+            let subTotal = 0;
+
+            rows.forEach(row => {
+                const qty = parseFloat(row.querySelector('.row-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.row-price').value) || 0;
+                const amount = qty * price;
+
+                row.querySelector('.row-amount').innerText = formatVND(amount);
+                totalQty += qty;
+                subTotal += amount;
+            });
+
+            document.getElementById('totalQty').innerText = totalQty;
+            document.getElementById('subTotal').innerText = formatVND(subTotal);
+
+            const discountPercent = parseFloat(document.getElementById('discountPercent').value) || 0;
+            const discountAmount = Math.round(subTotal * (discountPercent / 100));
+            const grandTotal = subTotal - discountAmount;
+
+            document.getElementById('discountAmount').innerText = `- ${formatVND(discountAmount)}`;
+            document.getElementById('grandTotal').innerText = formatVND(grandTotal);
+        }
+
+        // Inventory Cloud Operations
+        function updateCloudCount() {
+            document.getElementById('cloudProductCount').innerText = inventory.length;
+            document.getElementById('modalCatalogCount').innerText = inventory.length;
+        }
+
+        function renderInventoryGrid() {
+            const grid = document.getElementById('catalogGrid');
+            const searchKeyword = (document.getElementById('searchCatalogInput')?.value || '').toLowerCase();
+            grid.innerHTML = '';
+
+            const filtered = inventory.filter(item => item.code.toLowerCase().includes(searchKeyword));
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-6 text-gray-400 text-xs">Không tìm thấy mã hàng nào</div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-gray-200 rounded-lg p-2 flex flex-col items-center shadow-sm hover:shadow transition relative";
+                
+                card.innerHTML = `
+                    <div class="w-full h-24 bg-gray-100 rounded-md overflow-hidden mb-2 flex items-center justify-center border">
+                        ${item.image ? `<img src="${item.image}" class="w-full h-full object-cover">` : `<span class="text-xs text-gray-400">An An Gift</span>`}
+                    </div>
+                    <span class="font-bold text-burgundy text-sm">${item.code}</span>
+                    <span class="text-xs font-semibold text-gray-600 mb-2">${formatVND(item.price)}</span>
+                    <div class="flex space-x-1 w-full pt-1">
+                        <button onclick="editInventoryItem('${item.code}')" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold py-1 rounded">Sửa</button>
+                        <button onclick="deleteInventoryItem('${item.code}')" class="w-1/2 bg-red-500 hover:bg-red-600 text-white text-[11px] font-semibold py-1 rounded">Xóa</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            updateCloudCount();
+        }
+
+        function saveInventoryItem() {
+            const codeInput = document.getElementById('invCode');
+            const priceInput = document.getElementById('invPrice');
+            const fileInput = document.getElementById('invImageFile');
+            const originalCode = document.getElementById('editItemOriginalCode').value;
+
+            const code = codeInput.value.trim().toUpperCase();
+            const price = parseFloat(priceInput.value) || 0;
+
+            if (!code) {
+                alert('Vui lòng nhập Mã hàng!');
+                return;
+            }
+
+            const existingIndex = inventory.findIndex(i => i.code === (originalCode || code));
+
+            const processSave = (imageData) => {
+                const newItem = {
+                    code: code,
+                    price: price,
+                    image: imageData || (existingIndex >= 0 ? inventory[existingIndex].image : '')
+                };
+
+                if (existingIndex >= 0) {
+                    inventory[existingIndex] = newItem;
+                } else {
+                    inventory.push(newItem);
+                }
+
+                localStorage.setItem('anan_inventory', JSON.stringify(inventory));
+                resetInventoryForm();
+                renderInventoryGrid();
+            };
+
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    processSave(e.target.result);
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                processSave(null);
+            }
+        }
+
+        function editInventoryItem(code) {
+            const item = inventory.find(i => i.code === code);
+            if (item) {
+                document.getElementById('invCode').value = item.code;
+                document.getElementById('invPrice').value = item.price;
+                document.getElementById('editItemOriginalCode').value = item.code;
+            }
+        }
+
+        function deleteInventoryItem(code) {
+            if (confirm(`Bạn có chắc muốn xóa mã hàng ${code} khỏi kho đám mây?`)) {
+                inventory = inventory.filter(i => i.code !== code);
+                localStorage.setItem('anan_inventory', JSON.stringify(inventory));
+                renderInventoryGrid();
+            }
+        }
+
+        function resetInventoryForm() {
+            document.getElementById('invCode').value = '';
+            document.getElementById('invPrice').value = '';
+            document.getElementById('invImageFile').value = '';
+            document.getElementById('editItemOriginalCode').value = '';
+        }
+
+        // Draft Invoice Operations
+        function saveDraft() {
+            const custName = document.getElementById('custName').value.trim();
+            const custPhone = document.getElementById('custPhone').value.trim();
+            const custAddress = document.getElementById('custAddress').value.trim();
+            const invoiceCode = document.getElementById('invoiceCode').value;
+            const invoiceDate = document.getElementById('invoiceDate').value;
+            const discountPercent = document.getElementById('discountPercent').value;
+
+            const items = [];
+            document.querySelectorAll('#productTableBody tr').forEach(row => {
+                items.push({
+                    code: row.querySelector('input[placeholder="Mã hàng..."]').value,
+                    qty: row.querySelector('.row-qty').value,
+                    price: row.querySelector('.row-price').value,
+                    image: row.querySelector('.row-img-preview').src || '',
+                    note: row.querySelector('.row-note').value
+                });
+            });
+
+            const draft = {
+                id: Date.now(),
+                invoiceCode,
+                invoiceDate,
+                custName,
+                custPhone,
+                custAddress,
+                discountPercent,
+                items,
+                grandTotal: document.getElementById('grandTotal').innerText
+            };
+
+            drafts.push(draft);
+            localStorage.setItem('anan_drafts', JSON.stringify(drafts));
+            updateDraftCount();
+            alert('Đã lưu nháp hóa đơn thành công!');
+        }
+
+        function updateDraftCount() {
+            document.getElementById('draftCount').innerText = drafts.length;
+        }
+
+        function renderDraftsList() {
+            const container = document.getElementById('draftsListContainer');
+            container.innerHTML = '';
+
+            if (drafts.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-400 py-8 text-sm">Chưa có đơn hàng nháp nào</p>`;
+                return;
+            }
+
+            drafts.forEach((draft, idx) => {
+                const div = document.createElement('div');
+                div.className = "bg-gray-50 border border-gray-200 rounded-lg p-3 flex justify-between items-center hover:bg-gray-100 transition";
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold text-burgundy text-sm">${draft.invoiceCode} - ${draft.custName || 'Khách lẻ'}</div>
+                        <div class="text-xs text-gray-500">${draft.invoiceDate} | Tổng: <span class="font-bold text-gray-700">${draft.grandTotal}</span></div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="loadDraft(${draft.id})" class="bg-teal-600 hover:bg-teal-700 text-white text-xs px-3 py-1.5 rounded font-semibold">Tải đơn</button>
+                        <button onclick="deleteDraft(${draft.id})" class="bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1.5 rounded font-semibold">Xóa</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function loadDraft(id) {
+            const draft = drafts.find(d => d.id === id);
+            if (!draft) return;
+
+            document.getElementById('custName').value = draft.custName;
+            document.getElementById('custPhone').value = draft.custPhone;
+            document.getElementById('custAddress').value = draft.custAddress;
+            document.getElementById('invoiceCode').value = draft.invoiceCode;
+            document.getElementById('invoiceDate').value = draft.invoiceDate;
+            document.getElementById('discountPercent').value = draft.discountPercent;
+
+            const tableBody = document.getElementById('productTableBody');
+            tableBody.innerHTML = '';
+
+            draft.items.forEach(item => {
+                addNewRow(item);
+            });
+
+            closeModal('draftsModal');
+        }
+
+        function deleteDraft(id) {
+            if (confirm('Xóa đơn nháp này?')) {
+                drafts = drafts.filter(d => d.id !== id);
+                localStorage.setItem('anan_drafts', JSON.stringify(drafts));
+                updateDraftCount();
+                renderDraftsList();
+            }
+        }
+
+        // Modal Controls
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            if (id === 'draftsModal') renderDraftsList();
+            if (id === 'inventoryModal') renderInventoryGrid();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Export PNG Image (Requirement #4)
+        function exportImage() {
+            const invoiceArea = document.getElementById('invoiceArea');
+            const code = document.getElementById('invoiceCode').value || 'HD';
+            
+            // Temporary hide print controls if any
+            html2canvas(invoiceArea, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff"
+            }).then(canvas => {
+                const image = canvas.toDataURL("image/png");
+                const link = document.createElement('a');
+                link.download = `Hoa_Don_An_An_Gift_${code}.png`;
+                link.href = image;
+                link.click();
+            });
+        }
+
+        // Export PDF File (Requirement #4)
+        function exportPDF() {
+            const invoiceArea = document.getElementById('invoiceArea');
+            const code = document.getElementById('invoiceCode').value || 'HD';
+
+            const opt = {
+                margin:       0.3,
+                filename:     `Hoa_Don_An_An_Gift_${code}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(invoiceArea).save();
+        }
+    </script>
+</body>
+</html>
